@@ -14,6 +14,413 @@
   }
 })();
 
+// -----------------------------
+// Modal: Confirm
+// -----------------------------
+function showConfirmModal(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    const msgEl = document.getElementById('confirmMessage');
+    const yes = document.getElementById('confirmYes');
+    const no = document.getElementById('confirmNo');
+    msgEl.textContent = message || 'Are you sure?';
+    modal.classList.remove('hidden');
+
+    function cleanup() {
+      yes.removeEventListener('click', onYes);
+      no.removeEventListener('click', onNo);
+      overlay.removeEventListener('click', onNo);
+    }
+    function onYes() { cleanup(); modal.classList.add('hidden'); resolve(true); }
+    function onNo() { cleanup(); modal.classList.add('hidden'); resolve(false); }
+
+    const overlay = modal.querySelector('.absolute.inset-0');
+    yes.addEventListener('click', onYes);
+    no.addEventListener('click', onNo);
+    overlay.addEventListener('click', onNo);
+  });
+}
+
+// -----------------------------
+// Modal: Flight Details/Edit
+// -----------------------------
+function openLogModal(id, { mode = 'view' } = {}) {
+  const logs = loadLogs();
+  const log = logs.find(l => l.id === id);
+  if (!log) return;
+  MODAL_CURRENT_ID = id;
+  const modal = document.getElementById('logModal');
+  const content = document.getElementById('logModalContent');
+  modal.classList.remove('hidden');
+  if (mode === 'edit') renderLogModalEdit(log); else renderLogModalView(log);
+
+  // Bind close interactions (overlay, close button, Escape)
+  const overlay = modal.querySelector('.absolute.inset-0');
+  const closeBtn = document.getElementById('logModalClose');
+  const onClose = (e) => { e?.preventDefault?.(); closeLogModal(); };
+  const onEsc = (e) => { if (e.key === 'Escape') closeLogModal(); };
+
+  // Cleanup existing listeners if any before re-binding
+  if (LOG_MODAL_CLEANUP) { try { LOG_MODAL_CLEANUP(); } catch (_) {} LOG_MODAL_CLEANUP = null; }
+  overlay?.addEventListener('click', onClose);
+  closeBtn?.addEventListener('click', onClose);
+  window.addEventListener('keydown', onEsc);
+  LOG_MODAL_CLEANUP = () => {
+    overlay?.removeEventListener('click', onClose);
+    closeBtn?.removeEventListener('click', onClose);
+    window.removeEventListener('keydown', onEsc);
+  };
+}
+
+// New: Open a fresh modal to create a new flight log (not yet persisted)
+function openNewLogModal() {
+  const now = new Date();
+  const later = new Date(now.getTime() + 60 * 60000);
+  const log = {
+    id: uid(),
+    createdAt: new Date().toISOString(),
+    takeoffUtc: now.toISOString(),
+    landingUtc: later.toISOString(),
+    airborneMinutes: 60,
+    distanceNm: null,
+    dep: null,
+    arr: null,
+    depGate: '',
+    arrGate: '',
+    taxiways: '',
+    depRunway: '',
+    arrRunway: '',
+    expectedMach: null,
+    notes: '',
+  };
+  MODAL_CURRENT_ID = log.id;
+  const modal = document.getElementById('logModal');
+  modal.classList.remove('hidden');
+  renderLogModalEdit(log);
+
+  // Bind close interactions (overlay, close button, Escape)
+  const overlay = modal.querySelector('.absolute.inset-0');
+  const closeBtn = document.getElementById('logModalClose');
+  const onClose = (e) => { e?.preventDefault?.(); closeLogModal(); };
+  const onEsc = (e) => { if (e.key === 'Escape') closeLogModal(); };
+  if (LOG_MODAL_CLEANUP) { try { LOG_MODAL_CLEANUP(); } catch (_) {} LOG_MODAL_CLEANUP = null; }
+  overlay?.addEventListener('click', onClose);
+  closeBtn?.addEventListener('click', onClose);
+  window.addEventListener('keydown', onEsc);
+  LOG_MODAL_CLEANUP = () => {
+    overlay?.removeEventListener('click', onClose);
+    closeBtn?.removeEventListener('click', onClose);
+    window.removeEventListener('keydown', onEsc);
+  };
+}
+
+function closeLogModal() {
+  const modal = document.getElementById('logModal');
+  modal.classList.add('hidden');
+  destroyModalMap();
+  MODAL_CURRENT_ID = null;
+  if (LOG_MODAL_CLEANUP) { try { LOG_MODAL_CLEANUP(); } catch (_) {} LOG_MODAL_CLEANUP = null; }
+}
+
+function renderLogModalView(log) {
+  const content = document.getElementById('logModalContent');
+  const dep = log.dep?.icao || log.depCode || '?';
+  const arr = log.arr?.icao || log.arrCode || '?';
+  const dt = new Date(log.takeoffUtc);
+  const lt = new Date(log.landingUtc);
+  const dateStr = isNaN(dt.getTime()) ? '-' : dt.toISOString().replace('T', ' ').slice(0, 16) + 'Z';
+  const duration = fmtHM(log.airborneMinutes);
+  const distance = (log.distanceNm != null) ? `${log.distanceNm} NM` : '-- NM';
+  const mach = (log.expectedMach != null) ? String(log.expectedMach) : '';
+
+  content.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Date (UTC)</div>
+        <div class="font-medium mb-3">${dateStr}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Route</div>
+        <div class="font-medium mb-3">${dep} → ${arr}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Duration / Distance</div>
+        <div class="font-medium mb-3">${duration} • ${distance}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Runways</div>
+        <div class="font-medium mb-3">${log.depRunway || ''} / ${log.arrRunway || ''}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Gates</div>
+        <div class="font-medium mb-3">${log.depGate || ''} / ${log.arrGate || ''}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Taxiways</div>
+        <div class="font-medium mb-3">${log.taxiways || ''}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Expected Avg Speed (Mach)</div>
+        <div class="font-medium mb-3">${mach}</div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Notes</div>
+        <div class="font-medium whitespace-pre-wrap">${(log.notes || '').replace(/</g,'&lt;')}</div>
+      </div>
+      <div class="min-h-[300px]">
+        <div id="logModalMap" class="h-72 sm:h-80 rounded-md border border-gray-200 dark:border-gray-800"></div>
+      </div>
+    </div>
+    <div class="mt-4 flex justify-end gap-2">
+      <button id="modalEditBtn" class="px-3 py-2 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm">Edit</button>
+      <button id="modalDeleteBtn" class="px-3 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm">Delete</button>
+    </div>
+  `;
+
+  // Buttons
+  document.getElementById('modalEditBtn').addEventListener('click', () => openLogModal(log.id, { mode: 'edit' }));
+  document.getElementById('modalDeleteBtn').addEventListener('click', async () => {
+    const ok = await showConfirmModal('Delete this log?');
+    if (!ok) return;
+    const arr = loadLogs().filter(l => l.id !== log.id);
+    saveLogs(arr);
+    renderLogs();
+    closeLogModal();
+  });
+
+  // Map
+  setTimeout(() => initModalMap(log), 0);
+}
+
+function renderLogModalEdit(log) {
+  const content = document.getElementById('logModalContent');
+  content.innerHTML = `
+    <form id="modalEditForm" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="lg:order-1 order-2">
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1" for="modalDep">Departure Airport</label>
+          <div class="relative">
+            <input id="modalDep" type="text" autocomplete="off" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+            <div id="modalDepList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-60 overflow-auto shadow-lg"></div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1" for="modalArr">Arrival Airport</label>
+          <div class="relative">
+            <input id="modalArr" type="text" autocomplete="off" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+            <div id="modalArrList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-60 overflow-auto shadow-lg"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalDepGate">Depart Gate</label>
+            <input id="modalDepGate" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalArrGate">Arrive Gate</label>
+            <input id="modalArrGate" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1" for="modalTaxiways">Taxiways</label>
+          <input id="modalTaxiways" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalDepRunway">Depart Runway</label>
+            <div class="relative">
+              <input id="modalDepRunway" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+              <div id="modalDepRunwayList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-60 overflow-auto shadow-lg"></div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalArrRunway">Landing Runway</label>
+            <div class="relative">
+              <input id="modalArrRunway" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+              <div id="modalArrRunwayList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-60 overflow-auto shadow-lg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalTakeoff">Takeoff (UTC)</label>
+            <input id="modalTakeoff" type="datetime-local" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalMach">Avg Speed (Mach)</label>
+            <input id="modalMach" type="number" step="0.01" min="0.20" max="1.00" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" for="modalLanding">Landing (UTC)</label>
+            <input id="modalLanding" type="datetime-local" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Airborne</label>
+            <div id="modalAirborneTime" class="px-3 py-2 text-sm border border-transparent">--:--</div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1" for="modalNotes">Notes</label>
+          <textarea id="modalNotes" rows="4" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm"></textarea>
+        </div>
+
+        <div class="mt-2 flex justify-end gap-2">
+          <button type="button" id="modalCancelEdit" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm">Cancel</button>
+          <button type="submit" class="px-3 py-2 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm">Save</button>
+        </div>
+      </div>
+      <div class="lg:order-2 order-1">
+        <div id="logModalMap" class="h-72 sm:h-80 rounded-md border border-gray-200 dark:border-gray-800"></div>
+      </div>
+    </form>
+  `;
+
+  // Prefill
+  const depAp = log.dep; const arrAp = log.arr;
+  const depInput = document.getElementById('modalDep');
+  const arrInput = document.getElementById('modalArr');
+  depInput.value = depAp ? `${depAp.icao || ''}${depAp.iata ? '/' + depAp.iata : ''} — ${depAp.name || ''}` : '';
+  arrInput.value = arrAp ? `${arrAp.icao || ''}${arrAp.iata ? '/' + arrAp.iata : ''} — ${arrAp.name || ''}` : '';
+  depInput.dataset.icao = depAp?.icao || '';
+  arrInput.dataset.icao = arrAp?.icao || '';
+
+  document.getElementById('modalDepGate').value = log.depGate || '';
+  document.getElementById('modalArrGate').value = log.arrGate || '';
+  document.getElementById('modalTaxiways').value = log.taxiways || '';
+  document.getElementById('modalDepRunway').value = log.depRunway || '';
+  document.getElementById('modalArrRunway').value = log.arrRunway || '';
+  document.getElementById('modalMach').value = (log.expectedMach != null) ? String(log.expectedMach) : '';
+  document.getElementById('modalNotes').value = log.notes || '';
+  document.getElementById('modalTakeoff').value = dateToDatetimeLocalUTC(new Date(log.takeoffUtc));
+  document.getElementById('modalLanding').value = dateToDatetimeLocalUTC(new Date(log.landingUtc));
+  updateModalAirborne();
+
+  // Bind autocomplete and runway autocomplete
+  attachAutocomplete('modalDep', 'modalDepList', (a) => {
+    // Update local copies
+    log.dep = { icao: a.icao, iata: a.iata, name: a.name, lat: a.lat, lon: a.lon };
+    document.getElementById('modalDepRunway').value = '';
+    initModalMap(log);
+    updateModalAirborne();
+  });
+  attachAutocomplete('modalArr', 'modalArrList', (a) => {
+    log.arr = { icao: a.icao, iata: a.iata, name: a.name, lat: a.lat, lon: a.lon };
+    document.getElementById('modalArrRunway').value = '';
+    initModalMap(log);
+    updateModalAirborne();
+  });
+  attachRunwayAutocomplete('modalDepRunway', 'modalDepRunwayList', () => log.dep);
+  attachRunwayAutocomplete('modalArrRunway', 'modalArrRunwayList', () => log.arr);
+
+  // Bind fields
+  document.getElementById('modalTakeoff').addEventListener('input', () => { updateModalAirborne(); autoCalcModalLandingFromMach(log); });
+  document.getElementById('modalLanding').addEventListener('input', updateModalAirborne);
+  document.getElementById('modalMach').addEventListener('input', () => { autoCalcModalLandingFromMach(log); });
+
+  document.getElementById('modalCancelEdit').addEventListener('click', () => {
+    const exists = loadLogs().some(l => l.id === log.id);
+    if (exists) openLogModal(log.id, { mode: 'view' }); else closeLogModal();
+  });
+
+  document.getElementById('modalEditForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const t = parseUTCFromLocalInput(document.getElementById('modalTakeoff').value);
+    const l = parseUTCFromLocalInput(document.getElementById('modalLanding').value);
+    if (!log.dep || !log.arr) { announceAirportsStatus('Please select both departure and arrival airports from the list.'); return; }
+    if (!t || !l) { announceAirportsStatus('Please enter takeoff and landing times (UTC).'); return; }
+    if (l < t) { announceAirportsStatus('Landing time must be after takeoff time.'); return; }
+
+    const mins = minutesDiffUTC(t, l);
+    const distNm = haversineNM(log.dep.lat, log.dep.lon, log.arr.lat, log.arr.lon);
+
+    const updated = {
+      ...log,
+      createdAt: log.createdAt || new Date().toISOString(),
+      takeoffUtc: t.toISOString(),
+      landingUtc: l.toISOString(),
+      airborneMinutes: mins,
+      distanceNm: Math.round(distNm),
+      depGate: document.getElementById('modalDepGate').value.trim(),
+      arrGate: document.getElementById('modalArrGate').value.trim(),
+      taxiways: document.getElementById('modalTaxiways').value.trim(),
+      depRunway: document.getElementById('modalDepRunway').value.trim(),
+      arrRunway: document.getElementById('modalArrRunway').value.trim(),
+      expectedMach: (function(){ const v = parseFloat(document.getElementById('modalMach').value); return isFinite(v) ? v : null; })(),
+      notes: document.getElementById('modalNotes').value.trim(),
+    };
+
+    const logs = loadLogs();
+    const idx = logs.findIndex(l2 => l2.id === log.id);
+    if (idx !== -1) logs[idx] = updated; else logs.unshift(updated);
+    saveLogs(logs);
+    renderLogs();
+    openLogModal(log.id, { mode: 'view' });
+  });
+
+  // Map
+  setTimeout(() => initModalMap(log), 0);
+}
+
+function updateModalAirborne() {
+  const t = parseUTCFromLocalInput(document.getElementById('modalTakeoff').value);
+  const l = parseUTCFromLocalInput(document.getElementById('modalLanding').value);
+  const mins = t && l ? minutesDiffUTC(t, l) : null;
+  const el = document.getElementById('modalAirborneTime');
+  if (el) el.textContent = fmtHM(mins);
+}
+
+function autoCalcModalLandingFromMach(log) {
+  try {
+    const takeoffStr = document.getElementById('modalTakeoff').value;
+    const machStr = document.getElementById('modalMach')?.value || '';
+    if (!takeoffStr || !log.dep || !log.arr) return;
+    const mach = parseFloat(machStr);
+    if (!mach || mach <= 0) return;
+    const distNm = haversineNM(log.dep.lat, log.dep.lon, log.arr.lat, log.arr.lon);
+    if (!isFinite(distNm) || distNm <= 0) return;
+    const kts = machToKnots(mach);
+    if (kts <= 0) return;
+    const minutes = Math.round((distNm / kts) * 60);
+    const t0 = parseUTCFromLocalInput(takeoffStr);
+    if (!t0) return;
+    const landing = new Date(t0.getTime() + minutes * 60000);
+    document.getElementById('modalLanding').value = dateToDatetimeLocalUTC(landing);
+    updateModalAirborne();
+  } catch (_) {}
+}
+
+function initModalMap(log) {
+  const mapEl = document.getElementById('logModalMap');
+  if (!mapEl) return;
+  destroyModalMap();
+  MODAL_MAP = L.map('logModalMap', { worldCopyJump: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(MODAL_MAP);
+
+  // Fit/markers/route
+  if (log.dep) MODAL_MAP_MARKERS.dep = L.marker([log.dep.lat, log.dep.lon]).addTo(MODAL_MAP).bindPopup(`Dep: ${log.dep.icao}`);
+  if (log.arr) MODAL_MAP_MARKERS.arr = L.marker([log.arr.lat, log.arr.lon]).addTo(MODAL_MAP).bindPopup(`Arr: ${log.arr.icao}`);
+  if (log.dep && log.arr) {
+    const pts = interpolateGreatCircle(log.dep.lat, log.dep.lon, log.arr.lat, log.arr.lon, 96);
+    MODAL_MAP_ROUTE = L.polyline(pts, { color: '#2563eb', weight: 3 }).addTo(MODAL_MAP);
+    const bounds = L.latLngBounds(pts);
+    MODAL_MAP.fitBounds(bounds, { padding: [20, 20] });
+  } else {
+    MODAL_MAP.setView([20, 0], 2);
+  }
+
+  setTimeout(() => MODAL_MAP.invalidateSize(), 0);
+}
+
+function destroyModalMap() {
+  if (MODAL_MAP) {
+    MODAL_MAP.remove();
+    MODAL_MAP = null;
+  }
+  MODAL_MAP_MARKERS = { dep: null, arr: null };
+  MODAL_MAP_ROUTE = null;
+}
+
 // LocalStorage keys
 const LS_KEYS = {
   LOGS: 'msfl_logs',
@@ -31,9 +438,18 @@ let MAP = null;
 let MAP_MARKERS = { dep: null, arr: null };
 let MAP_ROUTE = null;
 // Runways, keyed by ICAO -> array of runway identifiers (ends like "22R")
+// New: maintain multi-flight overlays
+let MAP_MARKERS_ALL = [];
+let MAP_ROUTES_ALL = [];
 let RUNWAYS_BY_ICAO = {};
 // If user edits landing time manually, avoid auto-overwriting it
 let LANDING_MANUAL = false;
+// Modal state
+let MODAL_MAP = null;
+let MODAL_MAP_MARKERS = { dep: null, arr: null };
+let MODAL_MAP_ROUTE = null;
+let MODAL_CURRENT_ID = null;
+let LOG_MODAL_CLEANUP = null;
 
 // Utilities
 const toRad = (d) => (d * Math.PI) / 180;
@@ -333,12 +749,9 @@ function airportDisplay(a) {
 }
 
 function insertAirportsNotice() {
-  const form = document.getElementById('logForm');
-  if (!form) return;
-  const notice = document.createElement('div');
-  notice.id = 'airportsNotice';
-  notice.className = 'sm:col-span-2 -mt-2 mb-1';
-  notice.innerHTML = `
+  const host = document.getElementById('airportsNoticeSection') || document.getElementById('logForm');
+  if (!host) return;
+  const html = `
     <div class="flex items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs">
       <div id="airportsNoticeText" class="text-gray-700 dark:text-gray-300"></div>
       <div class="flex items-center gap-2">
@@ -346,7 +759,15 @@ function insertAirportsNotice() {
         <button id="clearAirportsCacheBtn" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600">Clear Cache</button>
       </div>
     </div>`;
-  form.prepend(notice);
+  if (host.id === 'airportsNoticeSection') {
+    host.innerHTML = html;
+  } else {
+    const notice = document.createElement('div');
+    notice.id = 'airportsNotice';
+    notice.className = 'sm:col-span-2 -mt-2 mb-1';
+    notice.innerHTML = html;
+    host.prepend(notice);
+  }
   document.getElementById('loadFullAirportsBtn')?.addEventListener('click', async () => {
     await loadFullAirports();
     await loadFullRunways();
@@ -430,34 +851,40 @@ function initMap() {
   MAP.setView([20, 0], 2);
 }
 
-function updateMap() {
+function updateMap() { renderAllFlightsMap(); }
+
+function clearAllFlightsMap() {
   if (!MAP) return;
-  // Clear previous route
-  if (MAP_ROUTE) {
-    MAP.removeLayer(MAP_ROUTE);
-    MAP_ROUTE = null;
-  }
-  // Clear markers
+  if (MAP_ROUTE) { MAP.removeLayer(MAP_ROUTE); MAP_ROUTE = null; }
   if (MAP_MARKERS.dep) { MAP.removeLayer(MAP_MARKERS.dep); MAP_MARKERS.dep = null; }
   if (MAP_MARKERS.arr) { MAP.removeLayer(MAP_MARKERS.arr); MAP_MARKERS.arr = null; }
+  for (const m of MAP_MARKERS_ALL) try { MAP.removeLayer(m); } catch (_) {}
+  for (const r of MAP_ROUTES_ALL) try { MAP.removeLayer(r); } catch (_) {}
+  MAP_MARKERS_ALL = [];
+  MAP_ROUTES_ALL = [];
+}
 
-  const distanceEl = document.getElementById('routeDistance');
-  if (depAirportSel) {
-    MAP_MARKERS.dep = L.marker([depAirportSel.lat, depAirportSel.lon]).addTo(MAP).bindPopup(`Dep: ${airportDisplay(depAirportSel)}`);
+function renderAllFlightsMap() {
+  if (!MAP) return;
+  clearAllFlightsMap();
+  const logs = loadLogs();
+  const boundsPts = [];
+  for (const l of logs) {
+    const dep = l?.dep; const arr = l?.arr;
+    if (!dep || !arr || dep.lat == null || dep.lon == null || arr.lat == null || arr.lon == null) continue;
+    const pts = interpolateGreatCircle(dep.lat, dep.lon, arr.lat, arr.lon, 96);
+    const route = L.polyline(pts, { color: '#2563eb', weight: 2, opacity: 0.9 }).addTo(MAP);
+    MAP_ROUTES_ALL.push(route);
+    boundsPts.push(...pts);
+    const m1 = L.circleMarker([dep.lat, dep.lon], { radius: 3, color: '#111827', weight: 1, fillColor: '#111827', fillOpacity: 1 }).addTo(MAP).bindPopup(`Dep: ${dep.icao}`);
+    const m2 = L.circleMarker([arr.lat, arr.lon], { radius: 3, color: '#111827', weight: 1, fillColor: '#111827', fillOpacity: 1 }).addTo(MAP).bindPopup(`Arr: ${arr.icao}`);
+    MAP_MARKERS_ALL.push(m1, m2);
   }
-  if (arrAirportSel) {
-    MAP_MARKERS.arr = L.marker([arrAirportSel.lat, arrAirportSel.lon]).addTo(MAP).bindPopup(`Arr: ${airportDisplay(arrAirportSel)}`);
-  }
-
-  if (depAirportSel && arrAirportSel) {
-    const pts = interpolateGreatCircle(depAirportSel.lat, depAirportSel.lon, arrAirportSel.lat, arrAirportSel.lon, 96);
-    MAP_ROUTE = L.polyline(pts, { color: '#2563eb', weight: 3 }).addTo(MAP);
-    const distNm = haversineNM(depAirportSel.lat, depAirportSel.lon, arrAirportSel.lat, arrAirportSel.lon);
-    if (distanceEl) distanceEl.textContent = `${distNm.toFixed(0)} NM`;
-    const bounds = L.latLngBounds(pts);
+  if (boundsPts.length) {
+    const bounds = L.latLngBounds(boundsPts);
     MAP.fitBounds(bounds, { padding: [30, 30] });
   } else {
-    if (distanceEl) distanceEl.textContent = '-- NM';
+    MAP.setView([20, 0], 2);
   }
 }
 
@@ -554,10 +981,14 @@ function attachRunwayAutocomplete(inputId, listId, getAirport) {
 }
 
 function refreshAirborneTime() {
-  const t = parseUTCFromLocalInput(document.getElementById('takeoffUtc').value);
-  const l = parseUTCFromLocalInput(document.getElementById('landingUtc').value);
+  const tEl = document.getElementById('takeoffUtc');
+  const lEl = document.getElementById('landingUtc');
+  const out = document.getElementById('airborneTime');
+  if (!tEl || !lEl || !out) return;
+  const t = parseUTCFromLocalInput(tEl.value);
+  const l = parseUTCFromLocalInput(lEl.value);
   const mins = t && l ? minutesDiffUTC(t, l) : null;
-  document.getElementById('airborneTime').textContent = fmtHM(mins);
+  out.textContent = fmtHM(mins);
 }
 
 // Convert Mach to approximate knots (speed of sound ~ 574 kts at cruise alt)
@@ -568,10 +999,14 @@ function machToKnots(mach) {
 
 function autoCalcLandingFromMach() {
   try {
-    const takeoffStr = document.getElementById('takeoffUtc').value;
-    const machStr = document.getElementById('expectedMach')?.value || '';
+    const tEl = document.getElementById('takeoffUtc');
+    const mEl = document.getElementById('expectedMach');
+    const lEl = document.getElementById('landingUtc');
+    if (!tEl || !mEl || !lEl) return;
+    const takeoffStr = tEl.value;
+    const machStr = mEl.value || '';
     if (!takeoffStr || !depAirportSel || !arrAirportSel) return;
-    if (LANDING_MANUAL && document.getElementById('landingUtc').value) return;
+    if (LANDING_MANUAL && lEl.value) return;
     const mach = parseFloat(machStr);
     if (!mach || mach <= 0) return;
     const distNm = haversineNM(depAirportSel.lat, depAirportSel.lon, arrAirportSel.lat, arrAirportSel.lon);
@@ -582,7 +1017,7 @@ function autoCalcLandingFromMach() {
     const t0 = parseUTCFromLocalInput(takeoffStr);
     if (!t0) return;
     const landing = new Date(t0.getTime() + minutes * 60000);
-    document.getElementById('landingUtc').value = dateToDatetimeLocalUTC(landing);
+    lEl.value = dateToDatetimeLocalUTC(landing);
     // Do not mark as manual; allow dynamic updates until user edits landing directly
     refreshAirborneTime();
     announceAirportsStatus('Landing auto-calculated from Mach and distance');
@@ -608,6 +1043,7 @@ function renderLogs() {
   for (const log of logs) {
     const tr = document.createElement('tr');
     tr.className = 'border-b border-gray-100 dark:border-gray-800';
+    tr.dataset.id = log.id;
 
     const dt = new Date(log.takeoffUtc);
     const dateStr = isNaN(dt.getTime()) ? '-' : dt.toISOString().replace('T', ' ').slice(0, 16) + 'Z';
@@ -626,18 +1062,31 @@ function renderLogs() {
   }
 
   // Bind actions
-  tbody.querySelectorAll('.deleteBtn').forEach(btn => btn.addEventListener('click', () => {
+  tbody.querySelectorAll('.deleteBtn').forEach(btn => btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
     const id = btn.getAttribute('data-id');
-    if (!confirm('Delete this log?')) return;
+    const ok = await showConfirmModal('Delete this log?');
+    if (!ok) return;
     const arr = loadLogs().filter(l => l.id !== id);
     saveLogs(arr);
     renderLogs();
+    closeLogModal();
   }));
 
-  tbody.querySelectorAll('.editBtn').forEach(btn => btn.addEventListener('click', () => {
+  tbody.querySelectorAll('.editBtn').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
     const id = btn.getAttribute('data-id');
-    startEditLog(id);
+    openLogModal(id, { mode: 'edit' });
   }));
+
+  // Row click opens details modal
+  tbody.querySelectorAll('tr').forEach(tr => tr.addEventListener('click', () => {
+    const id = tr.dataset.id;
+    if (id) openLogModal(id, { mode: 'view' });
+  }));
+
+  // Update map to reflect current logs
+  updateMap();
 }
 
 function startEditLog(id) {
@@ -803,12 +1252,17 @@ function bindToolbar() {
       importInput.value = '';
     }
   });
+
+  // Add Flight -> open modal in edit mode for a new entry
+  const addBtn = document.getElementById('addFlightBtn');
+  addBtn?.addEventListener('click', () => openNewLogModal());
 }
 
 // Boot
 window.addEventListener('DOMContentLoaded', async () => {
   initMap();
   bindToolbar();
+  insertAirportsNotice();
   await loadAirports();
   await loadRunways();
   bindForm();

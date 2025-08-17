@@ -69,100 +69,14 @@
 
       <!-- Main content -->
       <main class="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Form Panel -->
-          <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
-            <h2 class="text-base font-semibold mb-4">New Flight Log</h2>
-            <form id="logForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium mb-1" for="depAirport">Departure Airport (ICAO/IATA/Name)</label>
-                <div class="relative">
-                  <input id="depAirport" type="text" autocomplete="off" placeholder="e.g., KJFK / JFK / John F Kennedy" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                  <div id="depAirportList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-72 overflow-auto shadow-lg"></div>
-                </div>
-              </div>
+        <!-- Airports notice / load db area -->
+        <section id="airportsNoticeSection" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6"></section>
 
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium mb-1" for="arrAirport">Arrival Airport (ICAO/IATA/Name)</label>
-                <div class="relative">
-                  <input id="arrAirport" type="text" autocomplete="off" placeholder="e.g., EGLL / LHR / Heathrow" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                  <div id="arrAirportList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-72 overflow-auto shadow-lg"></div>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1" for="depGate">Departing Gate</label>
-                <input id="depGate" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1" for="arrGate">Arriving Gate</label>
-                <input id="arrGate" type="text" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-              </div>
-
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium mb-1" for="taxiways">Taxiways to Runway (comma-separated)</label>
-                <input id="taxiways" type="text" placeholder="e.g., A, A3, B" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1" for="depRunway">Departing Runway</label>
-                <div class="relative">
-                  <input id="depRunway" type="text" placeholder="e.g., 22R" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-                  <div id="depRunwayList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-60 overflow-auto shadow-lg"></div>
-                </div>
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1" for="arrRunway">Landing Runway</label>
-                <div class="relative">
-                  <input id="arrRunway" type="text" placeholder="e.g., 27L" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-                  <div id="arrRunwayList" class="absolute z-20 mt-1 w-full hidden rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 max-h-60 overflow-auto shadow-lg"></div>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium mb-1" for="takeoffUtc">Takeoff (UTC)</label>
-                <input id="takeoffUtc" type="datetime-local" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1" for="expectedMach">Expected Avg Speed (Mach)</label>
-                <input id="expectedMach" type="number" step="0.01" min="0.20" max="1.00" placeholder="0.78" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1" for="landingUtc">Landing (UTC)</label>
-                <input id="landingUtc" type="datetime-local" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" />
-              </div>
-
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium mb-1" for="notes">Notes</label>
-                <textarea id="notes" rows="4" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm" placeholder="Detailed notes..."></textarea>
-              </div>
-
-              <div class="sm:col-span-2 flex items-center justify-between">
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                  <span>Airborne Time:</span>
-                  <span id="airborneTime" class="font-semibold ml-1">--:--</span>
-                  <span class="ml-3">Distance:</span>
-                  <span id="routeDistance" class="font-semibold ml-1">-- NM</span>
-                </div>
-                <div class="flex gap-2">
-                  <button type="reset" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm">Reset</button>
-                  <button type="submit" class="px-3 py-2 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm">Save Log</button>
-                </div>
-              </div>
-            </form>
-          </section>
-
-          <!-- Map Panel -->
-          <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-0 min-h-[360px] h-[420px] sm:h-[520px]">
-            <div id="map" class="rounded-lg overflow-hidden h-full"></div>
-          </section>
-        </div>
-
-        <!-- Logs List -->
+        <!-- Logs List + Actions -->
         <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <h2 class="text-base font-semibold">Flight Logs</h2>
-            <div class="flex items-center gap-2 text-sm">
+            <div class="flex items-center gap-2 text-sm ml-auto">
               <label class="text-gray-600 dark:text-gray-400">Sort by</label>
               <select id="sortSelect" class="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 py-1 text-sm">
                 <option value="date_desc">Date (new → old)</option>
@@ -170,6 +84,7 @@
                 <option value="duration_desc">Duration (long → short)</option>
                 <option value="duration_asc">Duration (short → long)</option>
               </select>
+              <button id="addFlightBtn" class="ml-3 px-3 py-1.5 rounded-md bg-brand-600 hover:bg-brand-700 text-white">Add Flight</button>
             </div>
           </div>
           <div class="overflow-x-auto">
@@ -188,7 +103,45 @@
             </table>
           </div>
         </section>
+
+        <!-- Map Panel below everything -->
+        <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-0 min-h-[360px] h-[420px] sm:h-[520px]">
+          <div id="map" class="rounded-lg overflow-hidden h-full"></div>
+        </section>
       </main>
+    </div>
+
+    <!-- Flight Details Modal -->
+    <div id="logModal" class="hidden fixed inset-0 z-[9999]">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+      <div class="relative mx-auto max-w-4xl w-[94%] sm:w-auto mt-10">
+        <div class="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+            <h3 class="text-base font-semibold">Flight Details</h3>
+            <button id="logModalClose" class="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">✕</button>
+          </div>
+          <div id="logModalContent" class="p-4 max-h-[78vh] overflow-auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 z-[9999]">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+      <div class="relative mx-auto max-w-md w-[92%] sm:w-auto mt-24">
+        <div class="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+            <h3 class="text-base font-semibold">Confirm Action</h3>
+          </div>
+          <div class="p-4">
+            <p id="confirmMessage" class="text-sm"></p>
+          </div>
+          <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2">
+            <button id="confirmNo" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm">Cancel</button>
+            <button id="confirmYes" class="px-3 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm">Delete</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="./script.js"></script>

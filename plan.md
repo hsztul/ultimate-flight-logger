@@ -34,6 +34,17 @@ Track progress. We will check off items as we complete them.
 - [x] Expected Avg Speed (Mach) input and auto-calc landing from route distance
 - [ ] Testing/QA pass
 
+### Modal & UX Enhancements
+- [x] Flight log details modal with blurred background and embedded map
+- [x] In-place editing within the modal
+- [x] Delete action with confirmation modal
+- [x] Replace airport-selection alert with inline notice in banner
+- [x] Homepage layout: airports notice + logs list + Add Flight + map below
+- [x] Add Flight opens modal in edit mode for new entry
+- [x] Map plots all logged flights and updates after CRUD
+- [x] Modal close UX: overlay/close button/Escape with cleanup
+- [ ] Improve modal accessibility (focus trap, ARIA, keyboard navigation)
+
 ## Notes
 - Full airport DB: we attempt to load from `mwgg/Airports` JSON and cache in `localStorage` for offline use.
 - If caching is cleared, the app falls back to small bundled sample list.
