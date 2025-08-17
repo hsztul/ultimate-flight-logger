@@ -749,40 +749,36 @@ function airportDisplay(a) {
 }
 
 function insertAirportsNotice() {
-  const host = document.getElementById('airportsNoticeSection') || document.getElementById('logForm');
-  if (!host) return;
-  const html = `
-    <div class="flex items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs">
-      <div id="airportsNoticeText" class="text-gray-700 dark:text-gray-300"></div>
-      <div class="flex items-center gap-2">
-        <button id="loadFullAirportsBtn" class="px-2 py-1 rounded bg-brand-600 text-white hover:bg-brand-700">Load Full DB</button>
-        <button id="clearAirportsCacheBtn" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600">Clear Cache</button>
-      </div>
-    </div>`;
-  if (host.id === 'airportsNoticeSection') {
-    host.innerHTML = html;
-  } else {
-    const notice = document.createElement('div');
-    notice.id = 'airportsNotice';
-    notice.className = 'sm:col-span-2 -mt-2 mb-1';
-    notice.innerHTML = html;
-    host.prepend(notice);
-  }
-  document.getElementById('loadFullAirportsBtn')?.addEventListener('click', async () => {
-    await loadFullAirports();
-    await loadFullRunways();
-  });
-  document.getElementById('clearAirportsCacheBtn')?.addEventListener('click', () => {
-    localStorage.removeItem(LS_KEYS.AIRPORTS_FULL);
-    localStorage.removeItem(LS_KEYS.RUNWAYS_FULL);
-    SAMPLE_MODE = true;
-    announceAirportsStatus('Cleared caches. Using sample data.');
-  });
+  // No-op: buttons removed per design; we surface status via toast notifications instead.
 }
 
 function announceAirportsStatus(text) {
-  const el = document.getElementById('airportsNoticeText');
-  if (el) el.textContent = text;
+  // Backwards-compatible status hook: show as toast if needed.
+  showToast(String(text || ''), 'info');
+}
+
+// Toast notifications (auto-dismiss in 5s or on click)
+function showToast(message, type = 'success') {
+  try {
+    const body = document.body;
+    if (!body) return;
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toastContainer';
+      container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
+      body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    const base = 'pointer-events-auto rounded-md shadow-lg px-3 py-2 text-sm transition-opacity duration-200';
+    const color = type === 'error' ? 'bg-red-600 text-white' : (type === 'info' ? 'bg-gray-900 text-white' : 'bg-green-600 text-white');
+    toast.className = `${base} ${color}`;
+    toast.textContent = message || '';
+    const remove = () => { if (toast.parentNode) toast.parentNode.removeChild(toast); };
+    toast.addEventListener('click', remove);
+    container.appendChild(toast);
+    setTimeout(remove, 5000);
+  } catch (_) {}
 }
 
 async function loadFullAirports() {
@@ -1020,7 +1016,6 @@ function autoCalcLandingFromMach() {
     lEl.value = dateToDatetimeLocalUTC(landing);
     // Do not mark as manual; allow dynamic updates until user edits landing directly
     refreshAirborneTime();
-    announceAirportsStatus('Landing auto-calculated from Mach and distance');
   } catch (_) {
     // silent
   }
@@ -1269,4 +1264,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderLogs();
   refreshAirborneTime();
   updateMap();
+  // Auto-upgrade to full DBs in the background so no button click is needed
+  try {
+    if (SAMPLE_MODE) {
+      // Load full airports, then runways
+      loadFullAirports()
+        .then(() => loadFullRunways())
+        .then(() => showToast('Airports and runways loaded successfully', 'success'))
+        .catch(() => {});
+    } else {
+      // Airports already full via cache; ensure runways full if not cached
+      if (!localStorage.getItem(LS_KEYS.RUNWAYS_FULL)) {
+        loadFullRunways()
+          .then(() => showToast('Airports and runways loaded successfully', 'success'))
+          .catch(() => {});
+      }
+    }
+  } catch (_) {}
 });

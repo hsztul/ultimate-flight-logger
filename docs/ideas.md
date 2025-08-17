@@ -5,8 +5,8 @@
 - Let me click on an airport and either add it to the departure or arrival airport.
 
 2. Add a home page that shows a world map all of my routes
-- Load the routes on the map from local storage
-- Show all the logs under the map in a list and let me click on a log entry to view it.
+- [x] Load the routes on the map from local storage
+- [x] Show all the logs under the map in a list and let me click on a log entry to view it.
 - Show me the total distance of all routes.
 - Show me the total time of all routes.
 - Show me the total distance of all routes that I flew in the last 30 days.
