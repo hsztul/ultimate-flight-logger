@@ -32,6 +32,8 @@ let MAP_MARKERS = { dep: null, arr: null };
 let MAP_ROUTE = null;
 // Runways, keyed by ICAO -> array of runway identifiers (ends like "22R")
 let RUNWAYS_BY_ICAO = {};
+// If user edits landing time manually, avoid auto-overwriting it
+let LANDING_MANUAL = false;
 
 // Utilities
 const toRad = (d) => (d * Math.PI) / 180;
@@ -251,6 +253,16 @@ function parseUTCFromLocalInput(value) {
   const [hh, mm] = time.split(':').map(Number);
   const ms = Date.UTC(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
   return new Date(ms);
+}
+
+function dateToDatetimeLocalUTC(d) {
+  if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day}T${hh}:${mm}`;
 }
 
 function minutesDiffUTC(start, end) {
@@ -548,6 +560,37 @@ function refreshAirborneTime() {
   document.getElementById('airborneTime').textContent = fmtHM(mins);
 }
 
+// Convert Mach to approximate knots (speed of sound ~ 574 kts at cruise alt)
+function machToKnots(mach) {
+  const M = Math.max(0, Number(mach) || 0);
+  return M * 574; // TAS approximation
+}
+
+function autoCalcLandingFromMach() {
+  try {
+    const takeoffStr = document.getElementById('takeoffUtc').value;
+    const machStr = document.getElementById('expectedMach')?.value || '';
+    if (!takeoffStr || !depAirportSel || !arrAirportSel) return;
+    if (LANDING_MANUAL && document.getElementById('landingUtc').value) return;
+    const mach = parseFloat(machStr);
+    if (!mach || mach <= 0) return;
+    const distNm = haversineNM(depAirportSel.lat, depAirportSel.lon, arrAirportSel.lat, arrAirportSel.lon);
+    if (!isFinite(distNm) || distNm <= 0) return;
+    const kts = machToKnots(mach);
+    if (kts <= 0) return;
+    const minutes = Math.round((distNm / kts) * 60);
+    const t0 = parseUTCFromLocalInput(takeoffStr);
+    if (!t0) return;
+    const landing = new Date(t0.getTime() + minutes * 60000);
+    document.getElementById('landingUtc').value = dateToDatetimeLocalUTC(landing);
+    // Do not mark as manual; allow dynamic updates until user edits landing directly
+    refreshAirborneTime();
+    announceAirportsStatus('Landing auto-calculated from Mach and distance');
+  } catch (_) {
+    // silent
+  }
+}
+
 // Logs rendering
 function renderLogs() {
   const logs = loadLogs();
@@ -623,26 +666,16 @@ function startEditLog(id) {
   document.getElementById('taxiways').value = log.taxiways || '';
   document.getElementById('depRunway').value = log.depRunway || '';
   document.getElementById('arrRunway').value = log.arrRunway || '';
+  document.getElementById('expectedMach').value = (log.expectedMach != null && log.expectedMach !== '') ? String(log.expectedMach) : '';
   document.getElementById('notes').value = log.notes || '';
 
   // Parse UTC ISO to datetime-local value (without Z)
-  const toLocalInput = (iso) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '';
-    // We want to show UTC numbers in a timezone-less input: format YYYY-MM-DDTHH:MM using getUTC*
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    const hh = String(d.getUTCHours()).padStart(2, '0');
-    const mm = String(d.getUTCMinutes()).padStart(2, '0');
-    return `${y}-${m}-${day}T${hh}:${mm}`;
-  };
-  document.getElementById('takeoffUtc').value = toLocalInput(log.takeoffUtc);
-  document.getElementById('landingUtc').value = toLocalInput(log.landingUtc);
+  document.getElementById('takeoffUtc').value = dateToDatetimeLocalUTC(new Date(log.takeoffUtc));
+  document.getElementById('landingUtc').value = dateToDatetimeLocalUTC(new Date(log.landingUtc));
 
   refreshAirborneTime();
   updateMap();
+  LANDING_MANUAL = true; // respect existing landing value on edits
 }
 
 function bindForm() {
@@ -651,13 +684,13 @@ function bindForm() {
 
   insertAirportsNotice();
   attachAutocomplete('depAirport', 'depAirportList', (a) => {
-    depAirportSel = a; updateMap();
+    depAirportSel = a; updateMap(); autoCalcLandingFromMach();
     // Clear runway on airport change
     const depRunway = document.getElementById('depRunway');
     if (depRunway) depRunway.value = '';
   });
   attachAutocomplete('arrAirport', 'arrAirportList', (a) => {
-    arrAirportSel = a; updateMap();
+    arrAirportSel = a; updateMap(); autoCalcLandingFromMach();
     const arrRunway = document.getElementById('arrRunway');
     if (arrRunway) arrRunway.value = '';
   });
@@ -665,13 +698,15 @@ function bindForm() {
   attachRunwayAutocomplete('depRunway', 'depRunwayList', () => depAirportSel);
   attachRunwayAutocomplete('arrRunway', 'arrRunwayList', () => arrAirportSel);
 
-  document.getElementById('takeoffUtc').addEventListener('input', refreshAirborneTime);
-  document.getElementById('landingUtc').addEventListener('input', refreshAirborneTime);
+  document.getElementById('takeoffUtc').addEventListener('input', () => { refreshAirborneTime(); autoCalcLandingFromMach(); });
+  document.getElementById('landingUtc').addEventListener('input', () => { LANDING_MANUAL = true; refreshAirborneTime(); });
+  document.getElementById('expectedMach')?.addEventListener('input', () => { autoCalcLandingFromMach(); });
 
   form.addEventListener('reset', () => {
     depAirportSel = null;
     arrAirportSel = null;
     editId = null;
+    LANDING_MANUAL = false;
     document.getElementById('airborneTime').textContent = '--:--';
     updateMap();
   });
@@ -702,6 +737,7 @@ function bindForm() {
       taxiways: document.getElementById('taxiways').value.trim(),
       depRunway: document.getElementById('depRunway').value.trim(),
       arrRunway: document.getElementById('arrRunway').value.trim(),
+      expectedMach: (function(){ const v = parseFloat(document.getElementById('expectedMach').value); return isFinite(v) ? v : null; })(),
       notes: document.getElementById('notes').value.trim(),
     };
 

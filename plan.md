@@ -31,6 +31,7 @@ Track progress. We will check off items as we complete them.
 - [x] Add sample runways dataset `data/runways.sample.json`
 - [x] Runway suggestions autocomplete based on selected airport
 - [x] Optional: load/cache full global runways DB and unified clear-cache controls
+- [x] Expected Avg Speed (Mach) input and auto-calc landing from route distance
 - [ ] Testing/QA pass
 
 ## Notes
