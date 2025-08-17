@@ -75,17 +75,79 @@ async function loadRunways() {
   }
 }
 
+// Simple CSV -> objects parser (handles quotes and escaped quotes)
+function csvToObjects(text) {
+  if (!text) return [];
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+  if (!lines.length) return [];
+  const headers = parseCSVLine(lines[0]);
+  const objs = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (!cols.length) continue;
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      const key = headers[j];
+      obj[key] = cols[j] ?? '';
+    }
+    objs.push(obj);
+  }
+  return objs;
+}
+
+function parseCSVLine(line) {
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        cur += ch;
+      }
+    } else {
+      if (ch === ',') { out.push(cur); cur = ''; }
+      else if (ch === '"') { inQuotes = true; }
+      else { cur += ch; }
+    }
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
 async function loadFullRunways() {
-  const urls = [
-    'https://raw.githubusercontent.com/mwgg/Airports/master/runways.json',
+  // Prefer authoritative OurAirports CSV; keep JSON path as secondary if available later.
+  const sources = [
+    // Local optional copy (drop OurAirports runways.csv here to avoid CORS)
+    { type: 'csv', url: './data/runways.csv' },
+    // Direct (may fail due to CORS)
+    { type: 'csv', url: 'https://ourairports.com/data/runways.csv' },
+    // CORS-friendly proxies
+    { type: 'csv', url: 'https://cors.isomorphic-git.org/https://ourairports.com/data/runways.csv' },
+    { type: 'csv', url: 'https://r.jina.ai/http://ourairports.com/data/runways.csv' },
+    { type: 'csv', url: 'https://cdn.jsdelivr.net/gh/davidmegginson/ourairports-data/runways.csv' },
+    // Legacy JSON (currently 404, kept as placeholder)
+    { type: 'json', url: 'https://raw.githubusercontent.com/mwgg/Airports/master/runways.json' },
   ];
   let map = null;
-  for (const url of urls) {
+  for (const src of sources) {
+    const url = src.url;
     try {
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
-      const ct = res.headers.get('content-type') || '';
-      if (ct.includes('application/json') || url.endsWith('.json')) {
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+
+      if (src.type === 'csv' && (ct.includes('text/csv') || ct.includes('text/plain') || url.endsWith('.csv'))) {
+        const text = await res.text();
+        const rows = csvToObjects(text);
+        map = normalizeExternalRunways(rows);
+        if (map && Object.keys(map).length) break;
+      }
+
+      if (src.type === 'json' && (ct.includes('application/json') || url.endsWith('.json'))) {
         const raw = await res.json();
         map = normalizeExternalRunways(raw);
         if (map && Object.keys(map).length) break;
