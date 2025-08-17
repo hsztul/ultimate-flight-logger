@@ -45,6 +45,10 @@ Track progress. We will check off items as we complete them.
 - [x] Modal close UX: overlay/close button/Escape with cleanup
 - [ ] Improve modal accessibility (focus trap, ARIA, keyboard navigation)
 
+### Data Loading UX
+- [x] Auto-load full airports and runways on page load (no manual button)
+- [x] Replace banner/buttons with toast notification (auto-dismiss in 5s or on click)
+
 ## Notes
 - Full airport DB: we attempt to load from `mwgg/Airports` JSON and cache in `localStorage` for offline use.
 - If caching is cleared, the app falls back to small bundled sample list.

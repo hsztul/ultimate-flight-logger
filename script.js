@@ -450,6 +450,8 @@ let MODAL_MAP_MARKERS = { dep: null, arr: null };
 let MODAL_MAP_ROUTE = null;
 let MODAL_CURRENT_ID = null;
 let LOG_MODAL_CLEANUP = null;
+// Prevent duplicate ready toasts
+let READY_TOAST_SHOWN = false;
 
 // Utilities
 const toRad = (d) => (d * Math.PI) / 180;
@@ -474,7 +476,6 @@ async function loadRunways() {
     if (cached) {
       RUNWAYS_BY_ICAO = JSON.parse(cached) || {};
       if (Object.keys(RUNWAYS_BY_ICAO).length) {
-        announceAirportsStatus('Loaded full airports/runways from cache');
         return;
       }
     }
@@ -581,10 +582,8 @@ async function loadFullRunways() {
   RUNWAYS_BY_ICAO = map;
   try {
     localStorage.setItem(LS_KEYS.RUNWAYS_FULL, JSON.stringify(RUNWAYS_BY_ICAO));
-    announceAirportsStatus('Loaded full airports/runways database. Cached for offline use.');
   } catch (e) {
     console.warn('Failed to cache runways', e);
-    announceAirportsStatus('Loaded full airports/runways database. Cache failed; will reload next time.');
   }
 }
 
@@ -720,7 +719,6 @@ async function loadAirports() {
     if (cached) {
       AIRPORTS = JSON.parse(cached);
       SAMPLE_MODE = false;
-      announceAirportsStatus('Loaded full airport database from cache');
       return;
     }
   } catch (e) {
@@ -733,7 +731,6 @@ async function loadAirports() {
     if (!res.ok) throw new Error('airports.sample.json fetch failed');
     AIRPORTS = await res.json();
     SAMPLE_MODE = true;
-    announceAirportsStatus('Loaded sample airports. You can load the full database.');
   } catch (e) {
     console.error('Failed to load sample airports', e);
     AIRPORTS = [];
@@ -813,10 +810,8 @@ async function loadFullAirports() {
   SAMPLE_MODE = false;
   try {
     localStorage.setItem(LS_KEYS.AIRPORTS_FULL, JSON.stringify(AIRPORTS));
-    announceAirportsStatus(`Loaded full database (${AIRPORTS.length.toLocaleString()} airports). Cached for offline use.`);
   } catch (e) {
     console.warn('Failed to cache airports', e);
-    announceAirportsStatus(`Loaded full database (${AIRPORTS.length.toLocaleString()} airports). Cache failed; will reload next time.`);
   }
 }
 
@@ -1264,19 +1259,26 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderLogs();
   refreshAirborneTime();
   updateMap();
+  // If both datasets are already ready from cache, show success once
+  try {
+    if (!SAMPLE_MODE && Object.keys(RUNWAYS_BY_ICAO || {}).length && !READY_TOAST_SHOWN) {
+      showToast('Airports and runways loaded successfully', 'success');
+      READY_TOAST_SHOWN = true;
+    }
+  } catch (_) {}
   // Auto-upgrade to full DBs in the background so no button click is needed
   try {
     if (SAMPLE_MODE) {
       // Load full airports, then runways
       loadFullAirports()
         .then(() => loadFullRunways())
-        .then(() => showToast('Airports and runways loaded successfully', 'success'))
+        .then(() => { if (!READY_TOAST_SHOWN) { showToast('Airports and runways loaded successfully', 'success'); READY_TOAST_SHOWN = true; } })
         .catch(() => {});
     } else {
       // Airports already full via cache; ensure runways full if not cached
       if (!localStorage.getItem(LS_KEYS.RUNWAYS_FULL)) {
         loadFullRunways()
-          .then(() => showToast('Airports and runways loaded successfully', 'success'))
+          .then(() => { if (!READY_TOAST_SHOWN) { showToast('Airports and runways loaded successfully', 'success'); READY_TOAST_SHOWN = true; } })
           .catch(() => {});
       }
     }
