@@ -716,7 +716,7 @@ function bindForm() {
     const t = parseUTCFromLocalInput(document.getElementById('takeoffUtc').value);
     const l = parseUTCFromLocalInput(document.getElementById('landingUtc').value);
 
-    if (!depAirportSel || !arrAirportSel) return alert('Please select both departure and arrival airports from the list.');
+    if (!depAirportSel || !arrAirportSel) { announceAirportsStatus('Please select both departure and arrival airports from the list.'); return; }
     if (!t || !l) return alert('Please enter takeoff and landing times (UTC).');
     if (l < t) return alert('Landing time must be after takeoff time.');
 
