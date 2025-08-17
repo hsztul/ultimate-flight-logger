@@ -1,0 +1,9 @@
+[
+  { "icao": "KJFK", "iata": "JFK", "name": "John F Kennedy International", "lat": 40.6413111, "lon": -73.7781391 },
+  { "icao": "KLAX", "iata": "LAX", "name": "Los Angeles International", "lat": 33.9415889, "lon": -118.40853 },
+  { "icao": "KSFO", "iata": "SFO", "name": "San Francisco International", "lat": 37.6213129, "lon": -122.3789554 },
+  { "icao": "KSEA", "iata": "SEA", "name": "Seattle-Tacoma International", "lat": 47.450249, "lon": -122.308815 },
+  { "icao": "EGLL", "iata": "LHR", "name": "London Heathrow", "lat": 51.4700223, "lon": -0.4542955 },
+  { "icao": "EDDF", "iata": "FRA", "name": "Frankfurt am Main", "lat": 50.037933, "lon": 8.562152 },
+  { "icao": "RJTT", "iata": "HND", "name": "Tokyo Haneda", "lat": 35.5493932, "lon": 139.7798386 }
+]
